@@ -20,6 +20,7 @@
 "layout.css.font-variations.enabled" = true
 "layout.css.gradient-color-interpolation-method.enabled" = true
 "layout.css.light-dark.images.enabled" = false
+"layout.css.line-clamp.enabled" = false
 "layout.css.margin-rules.enabled" = false
 "layout.css.marker.restricted" = true
 "layout.css.motion-path-url.enabled" = false
