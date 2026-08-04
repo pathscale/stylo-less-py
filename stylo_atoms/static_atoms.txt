@@ -110,6 +110,7 @@ number
 onchange
 open
 orientation
+outside
 pagehide
 pageshow
 password
