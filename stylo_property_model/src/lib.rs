@@ -88,13 +88,16 @@ pub struct Longhand {
     /// [`Longhand::flags`] so the rest of the generator never sees the string.
     #[serde(default)]
     flags: Option<String>,
+    /// Aliases, written `"name"` or `"name:pref"`.
     #[serde(default)]
-    pub aliases: Vec<String>,
+    aliases: Vec<String>,
     /// Additional aliases for Gecko only, not for Servo.
     #[serde(default)]
-    pub extra_gecko_aliases: Vec<String>,
+    extra_gecko_aliases: Vec<String>,
+    /// Vendor prefixes, written `"prefix"` or `"prefix:pref"`, each of which
+    /// becomes the alias `-<prefix>-<name>`.
     #[serde(default)]
-    pub extra_prefixes: Vec<String>,
+    extra_prefixes: Vec<String>,
     #[serde(default)]
     pub ignored_when_colors_disabled: bool,
     #[serde(default)]
@@ -112,6 +115,82 @@ impl Longhand {
             .as_deref()
             .map(|flags| flags.split_whitespace().collect())
             .unwrap_or_default()
+    }
+
+    /// Where the property can be used. `content` when the TOML omits it, which
+    /// is what `data.py` defaults the constructor argument to.
+    pub fn enabled_in(&self) -> EnabledIn {
+        self.enabled_in.unwrap_or(EnabledIn::Content)
+    }
+
+    /// Every alias of this property, prefixed forms included.
+    ///
+    /// `extra_prefixes` is not a separate concept downstream: `data.py` expands
+    /// each prefix into an ordinary alias named `-<prefix>-<name>` before
+    /// anything reads the list, so expanding it anywhere else invites the two
+    /// to drift.
+    pub fn aliases(&self) -> Vec<Alias> {
+        Alias::expand(&self.name, &self.aliases, &self.extra_prefixes)
+    }
+
+    /// Aliases that exist only in a Gecko build.
+    pub fn extra_gecko_aliases(&self) -> Vec<Alias> {
+        Alias::expand(&self.name, &self.extra_gecko_aliases, &[])
+    }
+
+    /// Whether the property is behind a preference for this engine, which is
+    /// what `data.py` calls experimental.
+    pub fn experimental(&self, engine: Engine) -> bool {
+        match engine {
+            Engine::Gecko => self.gecko_pref.is_some(),
+            Engine::Servo => self.servo_pref.is_some(),
+        }
+    }
+
+    /// The rule types the property may appear in.
+    ///
+    /// Absent means `data.py`'s default set rather than none: style, keyframe
+    /// and scope. Reading the raw `Option` as "no rules allowed" would silently
+    /// drop most properties from the `all` shorthand.
+    pub fn rule_types_allowed(&self) -> Vec<RuleType> {
+        self.rule_types_allowed
+            .clone()
+            .unwrap_or_else(|| vec![RuleType::Style, RuleType::Keyframe, RuleType::Scope])
+    }
+}
+
+/// One alias of a property.
+///
+/// The TOML writes these as `"name"` or `"name:pref"`, which is the third
+/// place structure hides inside a string. Parsed once, here.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Alias {
+    pub name: String,
+    /// The Gecko preference gating the alias, when the entry carries one.
+    pub gecko_pref: Option<String>,
+}
+
+impl Alias {
+    fn parse(entry: &str) -> (String, Option<String>) {
+        match entry.split_once(':') {
+            Some((name, pref)) => (name.to_owned(), Some(pref.to_owned())),
+            None => (entry.to_owned(), None),
+        }
+    }
+
+    fn expand(property: &str, aliases: &[String], extra_prefixes: &[String]) -> Vec<Self> {
+        let named = aliases.iter().map(|entry| {
+            let (name, gecko_pref) = Self::parse(entry);
+            Self { name, gecko_pref }
+        });
+        let prefixed = extra_prefixes.iter().map(|entry| {
+            let (prefix, gecko_pref) = Self::parse(entry);
+            Self {
+                name: format!("-{prefix}-{property}"),
+                gecko_pref,
+            }
+        });
+        named.chain(prefixed).collect()
     }
 }
 
@@ -139,11 +218,11 @@ pub struct Shorthand {
     #[serde(default)]
     pub extra_gecko_sub_properties: Vec<String>,
     #[serde(default)]
-    pub aliases: Vec<String>,
+    aliases: Vec<String>,
     #[serde(default)]
-    pub extra_gecko_aliases: Vec<String>,
+    extra_gecko_aliases: Vec<String>,
     #[serde(default)]
-    pub extra_prefixes: Vec<String>,
+    extra_prefixes: Vec<String>,
     #[serde(default)]
     pub rule_types_allowed: Option<Vec<RuleType>>,
     #[serde(default)]
@@ -156,6 +235,20 @@ impl Shorthand {
             .as_deref()
             .map(|flags| flags.split_whitespace().collect())
             .unwrap_or_default()
+    }
+
+    /// Shorthands carry no `enabled_in` key, so they always take the `content`
+    /// default that `data.py` passes for them.
+    pub fn enabled_in(&self) -> EnabledIn {
+        EnabledIn::Content
+    }
+
+    pub fn aliases(&self) -> Vec<Alias> {
+        Alias::expand(&self.name, &self.aliases, &self.extra_prefixes)
+    }
+
+    pub fn extra_gecko_aliases(&self) -> Vec<Alias> {
+        Alias::expand(&self.name, &self.extra_gecko_aliases, &[])
     }
 }
 
@@ -363,6 +456,46 @@ impl PropertyDatabase {
         self.longhands
             .iter()
             .filter(move |property| property.engine.is_none_or(|only| only == engine))
+    }
+
+    /// Members of the synthetic `all` shorthand, in cascade order.
+    ///
+    /// `all` is not in `shorthands.toml`. `data.py` builds it in
+    /// `declare_all_shorthand` because declaring it through the normal helper
+    /// generates very large types, so any generator replacing that file has to
+    /// build it too or lose a shorthand.
+    ///
+    /// Logical properties come first, deliberately: physical counterparts
+    /// applied first would win, which was
+    /// <https://bugzilla.mozilla.org/show_bug.cgi?id=1410028>. Within each
+    /// group the sort is by style struct, for cache locality when transitions
+    /// iterate the shorthand.
+    pub fn all_shorthand_members(&self, engine: Engine) -> Vec<&Longhand> {
+        let eligible = |property: &&Longhand| {
+            // `direction` and `unicode-bidi` are excluded by the spec: `all`
+            // does not reset them.
+            !matches!(property.name.as_str(), "direction" | "unicode-bidi")
+                && (property.enabled_in() == EnabledIn::Content || property.experimental(engine))
+                && property.rule_types_allowed().contains(&RuleType::Style)
+        };
+        let (mut logical, mut physical): (Vec<&Longhand>, Vec<&Longhand>) = self
+            .longhands_for(engine)
+            .filter(eligible)
+            .partition(|property| property.logical);
+        // Stable, so properties within one struct keep declaration order, as
+        // Python's sort does.
+        //
+        // UNVERIFIED against properties.rs: `data.py` sorts on
+        // `StyleStruct.name`, which is CamelCase, while this sorts on the
+        // TOML's lowercase `struct` value. The two agree for every name in the
+        // file today, since case is uniform and no name differs only by
+        // separator, but this ordering is observable in the generated `all`
+        // shorthand and must be checked byte for byte when properties.rs is
+        // generated here.
+        logical.sort_by(|left, right| left.style_struct.cmp(&right.style_struct));
+        physical.sort_by(|left, right| left.style_struct.cmp(&right.style_struct));
+        logical.extend(physical);
+        logical
     }
 
     pub fn shorthands_for(&self, engine: Engine) -> impl Iterator<Item = &Shorthand> {
