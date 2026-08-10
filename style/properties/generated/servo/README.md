@@ -1,7 +1,7 @@
 # Pre-generated Servo properties
 
 These files are the deterministic output of Stylo's Servo property generator at upstream
-commit `2d289c14fdf46952d52cabce63b1f0dc55b2ccde`:
+commit `f6d1d525db9a7fb1aa0842926458e63faa4f44c7`:
 
 - `properties.rs`
 - `css-properties.html`

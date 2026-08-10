@@ -74074,13 +74074,13 @@ impl NonCustomPropertyId {
         static EXPERIMENTAL: NonCustomPropertyIdSet = 
 
 
-    NonCustomPropertyIdSet::from_storage([0x60401c00, 0x29007030, 0x201e01e1, 0xc00004e0, 0xffc5101b, 0xc0290883, 0xf006610, 0xff000, 0x0, 0x0, 0xb01f0020, 0x2ff, 0xc, 0x1c003f8, 0xc])
+    NonCustomPropertyIdSet::from_storage([0x60401c00, 0x29007030, 0x201e01e1, 0x800004e0, 0xffc5101b, 0xc0290883, 0xf006610, 0xff000, 0x0, 0x0, 0xb01f0020, 0x2ff, 0xc, 0x1c003f8, 0xc])
 
 ;
         static ALWAYS_ENABLED: NonCustomPropertyIdSet = 
 
 
-    NonCustomPropertyIdSet::from_storage([0x9fbfe3ff, 0xd6ff0fcf, 0xdfe1fe1e, 0x3ffffb1f, 0x3aefe4, 0x3fd6f77c, 0xf0ff99eb, 0xfff00fff, 0xffffffff, 0xffffffff, 0x4fe0ffdf, 0xfffffd00, 0xfffffff3, 0xfe3ffc07, 0x13])
+    NonCustomPropertyIdSet::from_storage([0x9fbfe3ff, 0xd6ff0fcf, 0xdfe1fe1e, 0x7ffffb1f, 0x3aefe4, 0x3fd6f77c, 0xf0ff99eb, 0xfff00fff, 0xffffffff, 0xffffffff, 0x4fe0ffdf, 0xfffffd00, 0xfffffff3, 0xfe3ffc07, 0x13])
 
 ;
 
@@ -74241,7 +74241,6 @@ impl NonCustomPropertyId {
                     
                     
                     
-                        126 => static_prefs::pref!("layout.unimplemented"),
                     
                         127 => static_prefs::pref!("layout.columns.enabled"),
                     
@@ -121230,6 +121229,7 @@ pub(crate) fn restyle_damage_repaint (old: &ComputedValues, new: &ComputedValues
         if !std::ptr::eq(old_inherited_ui, new_inherited_ui) {
             if
                 old_inherited_ui.caret_color != new_inherited_ui.caret_color ||
+                old_inherited_ui.color_scheme != new_inherited_ui.color_scheme ||
                 old_inherited_ui.cursor != new_inherited_ui.cursor ||
                 old_inherited_ui.pointer_events != new_inherited_ui.pointer_events ||
             false {
@@ -121581,7 +121581,6 @@ pub(crate) fn restyle_damage_rebuild_box (old: &ComputedValues, new: &ComputedVa
         let new_inherited_ui = new.get_inherited_ui();
         if !std::ptr::eq(old_inherited_ui, new_inherited_ui) {
             if
-                old_inherited_ui.color_scheme != new_inherited_ui.color_scheme ||
                 old_inherited_ui.scrollbar_color != new_inherited_ui.scrollbar_color ||
             false {
                 return true;
