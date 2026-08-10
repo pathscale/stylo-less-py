@@ -9,4 +9,8 @@ description = "Generates the property sources that build.py used to emit"
 # Intended to be used from style/build.rs, so it stays a library with no heavy
 # dependencies and no dependency on the style crate it generates for.
 [dependencies]
-stylo_property_model = { version = "0.19.0", path = "../stylo_property_model" }
+# Path only, deliberately. Pinning the version here meant the workspace bump to
+# 0.20.0 broke this crate for no reason: these two are always released together
+# out of the same workspace, so a version requirement between them can only ever
+# be wrong.
+stylo_property_model = { path = "../stylo_property_model" }
