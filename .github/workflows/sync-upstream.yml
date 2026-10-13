@@ -9,10 +9,13 @@ jobs:
   sync:
     name: Sync
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 1
+          persist-credentials: false
       - uses: actions/cache@v3
         with:
           path: _cache/upstream
@@ -20,4 +23,7 @@ jobs:
       - run: |
           ./sync.sh _filtered
           git fetch -f --progress ./_filtered main:upstream
-          git push -fu --progress origin upstream
+      - name: Push upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: git push -fu --progress "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" upstream
