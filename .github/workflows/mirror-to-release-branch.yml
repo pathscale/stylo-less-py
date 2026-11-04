@@ -1,8 +1,6 @@
 name: 🪞 Mirror `main`
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
 
 jobs:
   mirror:
