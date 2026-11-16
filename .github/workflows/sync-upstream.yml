@@ -24,4 +24,4 @@ jobs:
       - name: Push upstream
         env:
           GH_TOKEN: ${{ github.token }}
-        run: git push -fu --progress "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" upstream
+        run: git push -f --progress "https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git" upstream

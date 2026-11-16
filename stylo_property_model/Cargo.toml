@@ -5,6 +5,7 @@ authors = ["The Servo Project Developers"]
 license = "MPL-2.0"
 edition = "2021"
 description = "The CSS property database, parsed from TOML into typed Rust"
+publish = false
 
 # No build-time dependency on the style crate, and none on a Python interpreter.
 # This is the model `data.py` builds, expressed as types, so the generator that
